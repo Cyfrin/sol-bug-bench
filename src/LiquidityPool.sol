@@ -78,7 +78,6 @@ contract LiquidityPool is Ownable {
      */
     function depositFor(address user) external payable {
         require(msg.value > 0, "Invalid deposit");
-        // VULNERABILITY: Missing zero address check - allows deposits to address(0)
         _processDeposit(user, msg.value);
     }
 
@@ -97,15 +96,12 @@ contract LiquidityPool is Ownable {
         );
 
         // Calculate ETH amount based on proportional share of pool
-        // VULNERABILITY: Integer division precision loss - division before multiplication
         uint256 amount = shares * address(this).balance / shareToken.totalSupply();
 
-        // VULNERABILITY: Reentrancy - external call before state updates
-        // Transfer ETH to user (can reenter before shares are burned)
+        // Transfer ETH to user
         (bool success,) = msg.sender.call{value: amount}("");
-        // VULNERABILITY: Unchecked return value - if call fails, state is still updated
         if (!success) {
-            // Silent failure - funds may be lost
+            // Silent failure
         }
 
         // Burn the shares to maintain proper accounting
@@ -191,8 +187,6 @@ contract LiquidityPool is Ownable {
      * Allows quick access to funds in case of emergency
      */
     function emergencyWithdraw() external {
-        // VULNERABILITY: Missing access control - anyone can call this function
-        // VULNERABILITY: Missing zero address check - can send to address(0)
         address payable recipient = payable(msg.sender);
         uint256 balance = address(this).balance;
         
@@ -208,7 +202,6 @@ contract LiquidityPool is Ownable {
      * @param newReward The new reward amount
      */
     function updateReward(address user, uint256 newReward) external {
-        // VULNERABILITY: Missing access control - anyone can manipulate rewards
         rewards[user] = newReward;
     }
 }
