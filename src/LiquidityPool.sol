@@ -78,6 +78,7 @@ contract LiquidityPool is Ownable {
      */
     function depositFor(address user) external payable {
         require(msg.value > 0, "Invalid deposit");
+        // VULNERABILITY: Missing zero address check - allows deposits to address(0)
         _processDeposit(user, msg.value);
     }
 
@@ -96,11 +97,16 @@ contract LiquidityPool is Ownable {
         );
 
         // Calculate ETH amount based on proportional share of pool
+        // VULNERABILITY: Integer division precision loss - division before multiplication
         uint256 amount = shares * address(this).balance / shareToken.totalSupply();
 
-        // Transfer ETH to user
+        // VULNERABILITY: Reentrancy - external call before state updates
+        // Transfer ETH to user (can reenter before shares are burned)
         (bool success,) = msg.sender.call{value: amount}("");
-        require(success, "Transfer failed");
+        // VULNERABILITY: Unchecked return value - if call fails, state is still updated
+        if (!success) {
+            // Silent failure - funds may be lost
+        }
 
         // Burn the shares to maintain proper accounting
         shareToken.transferFrom(msg.sender, address(this), shares);
@@ -178,5 +184,31 @@ contract LiquidityPool is Ownable {
 
         // Emit event for tracking deposits
         emit Deposit(user, amount, shares);
+    }
+
+    /**
+     * @dev Emergency withdrawal function for admin use
+     * Allows quick access to funds in case of emergency
+     */
+    function emergencyWithdraw() external {
+        // VULNERABILITY: Missing access control - anyone can call this function
+        // VULNERABILITY: Missing zero address check - can send to address(0)
+        address payable recipient = payable(msg.sender);
+        uint256 balance = address(this).balance;
+        
+        // Transfer all funds to caller
+        (bool success,) = recipient.call{value: balance}("");
+        require(success, "Emergency withdrawal failed");
+    }
+
+    /**
+     * @dev Allows updating reward balance for any user
+     * Useful for manual reward adjustments
+     * @param user The user address to update
+     * @param newReward The new reward amount
+     */
+    function updateReward(address user, uint256 newReward) external {
+        // VULNERABILITY: Missing access control - anyone can manipulate rewards
+        rewards[user] = newReward;
     }
 }
